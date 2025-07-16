@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Object Tracking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #121212;
+            color: #fff;
+            text-align: center;
+        }
+
+        .container {
+            margin-top: 20px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            display: inline-block;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 255, 128, 0.2);
+        }
+
+        #video {
+            display: block;
+            width: 640px;
+            height: 480px;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 640px;
+            height: 480px;
+            cursor: crosshair;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Real-Time Object Tracking</h1>
+    <div class="container">
+        <div class="video-wrapper">
+            <img id="video" src="{{ url_for('video_feed') }}">
+            <canvas id="canvas"></canvas>
+        </div>
+        <p>Drag to select the object to track</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const video = document.getElementById("video");
+
+        let startX, startY, isDrawing = false;
+
+        // Adjust canvas to match video size
+        window.onload = () => {
+            canvas.width = video.clientWidth;
+            canvas.height = video.clientHeight;
+        };
+
+        canvas.addEventListener("mousedown", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            isDrawing = true;
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            const width = currentX - startX;
+            const height = currentY - startY;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "lime";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(startX, startY, width, height);
+        });
+
+        canvas.addEventListener("mouseup", (e) => {
+            isDrawing = false;
+            const rect = canvas.getBoundingClientRect();
+            const endX = e.clientX - rect.left;
+            const endY = e.clientY - rect.top;
+            const width = endX - startX;
+            const height = endY - startY;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const bbox = [startX, startY, width, height];
+
+            fetch('/set_bbox', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bbox: bbox })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    console.error('Failed to send bbox:', res.status);
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log("Bounding box set:", data);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        });
+    </script>
+</body>
+</html>
